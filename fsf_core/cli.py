@@ -882,6 +882,308 @@ def audit(file: str, as_json: bool):
         ui.print_info("Minor inconsistencies — probably fine for casual inspection")
 
 
+# ─────────────────────────────────────────────────────
+#  HASH command
+# ─────────────────────────────────────────────────────
+@cli.command()
+@click.argument("file", type=click.Path(exists=True))
+@click.option("--mutate", is_flag=True, help="Mutate file hash by appending junk bytes")
+@click.option("--verify", "expected_hash", type=str, default=None, help="Verify file against expected SHA256 hash")
+@click.option("--algorithm", "-a", type=click.Choice(["md5", "sha1", "sha256", "sha512"]), default=None, help="Hash algorithm")
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file for mutated hash")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def hash(file: str, mutate: bool, expected_hash: str, algorithm: str, output: str, as_json: bool):
+    """Compute, verify, or mutate file hashes."""
+    from .hasher import FileHasher
+
+    filepath = _validate_file(file)
+    ui.print_banner()
+    ui.print_file_header(str(filepath))
+
+    if expected_hash:
+        alg = algorithm or "sha256"
+        match = FileHasher.verify(filepath, expected_hash, alg)
+        if match:
+            ui.print_success(f"Hash MATCHES ({alg})")
+        else:
+            actual = FileHasher.compute(filepath, [alg])[alg]
+            ui.print_error(f"Hash MISMATCH ({alg})")
+            ui.print_info(f"Expected: {expected_hash}")
+            ui.print_info(f"Actual:   {actual}")
+        return
+
+    if mutate:
+        out_path = Path(output) if output else filepath
+        result = FileHasher.mutate_hash(filepath, out_path)
+        if as_json:
+            click.echo(json.dumps(result, indent=2))
+        else:
+            from rich.table import Table
+            table = Table(title="Hash Mutation", show_header=True)
+            table.add_column("Algorithm", style="cyan")
+            table.add_column("Before", style="red")
+            table.add_column("After", style="green")
+            for alg in result['old']:
+                table.add_row(alg.upper(), result['old'][alg], result['new'][alg])
+            ui.console.print(table)
+            ui.print_success(f"Hash mutated → {out_path.name}")
+        return
+
+    # Default: compute hashes
+    algos = [algorithm] if algorithm else ["md5", "sha1", "sha256"]
+    hashes = FileHasher.compute(filepath, algos)
+    if as_json:
+        click.echo(json.dumps(hashes, indent=2))
+    else:
+        from rich.table import Table
+        table = Table(title="File Hashes", show_header=True)
+        table.add_column("Algorithm", style="cyan")
+        table.add_column("Hash", style="green")
+        for alg, val in hashes.items():
+            table.add_row(alg.upper(), val)
+        ui.console.print(table)
+
+
+# ─────────────────────────────────────────────────────
+#  STRIP command (surgical removal)
+# ─────────────────────────────────────────────────────
+@cli.command()
+@click.argument("file", type=click.Path(exists=True))
+@click.option("--gps", is_flag=True, help="Strip only GPS/location data")
+@click.option("--dates", is_flag=True, help="Strip only date/time info")
+@click.option("--device", is_flag=True, help="Strip only camera/device identification")
+@click.option("--thumbnail", is_flag=True, help="Strip embedded thumbnail")
+@click.option("--all", "strip_all", is_flag=True, help="Strip GPS + dates + device + thumbnail")
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file")
+def strip(file: str, gps: bool, dates: bool, device: bool, thumbnail: bool, strip_all: bool, output: str):
+    """Surgically remove specific metadata categories (GPS, dates, device, thumbnail)."""
+    from .strip import SurgicalStripper
+
+    filepath = _validate_file(file)
+    out_path = Path(output) if output else filepath
+
+    if not any([gps, dates, device, thumbnail, strip_all]):
+        ui.print_error("Specify what to strip: --gps, --dates, --device, --thumbnail, or --all")
+        ui.print_info("Run [cyan]fsf strip --help[/cyan] for options")
+        sys.exit(1)
+
+    ui.print_banner()
+    ui.print_file_header(str(filepath))
+
+    # Work on a copy if output specified
+    if output and filepath != out_path:
+        import shutil
+        shutil.copy2(filepath, out_path)
+        work_path = out_path
+    else:
+        work_path = filepath
+
+    stripped = []
+    if gps or strip_all:
+        if SurgicalStripper.strip_gps(work_path):
+            stripped.append("GPS/location")
+    if dates or strip_all:
+        if SurgicalStripper.strip_dates(work_path):
+            stripped.append("date/time")
+    if device or strip_all:
+        if SurgicalStripper.strip_device(work_path):
+            stripped.append("camera/device ID")
+    if thumbnail or strip_all:
+        if SurgicalStripper.strip_thumbnail(work_path):
+            stripped.append("thumbnail")
+
+    if stripped:
+        ui.print_success(f"Stripped: {', '.join(stripped)}")
+    else:
+        ui.print_warning("No metadata categories were stripped (file may not be a JPEG)")
+
+
+# ─────────────────────────────────────────────────────
+#  TEMPLATE command group
+# ─────────────────────────────────────────────────────
+@cli.group()
+def template():
+    """Save, load, and manage metadata templates."""
+    pass
+
+
+@template.command("save")
+@click.argument("file", type=click.Path(exists=True))
+@click.argument("name")
+@click.option("--description", "-d", default="", help="Template description")
+def template_save(file: str, name: str, description: str):
+    """Extract metadata from FILE and save as a named template."""
+    from .templates import TemplateManager
+
+    filepath = _validate_file(file)
+    handler, ftype = _get_handler(filepath)
+
+    if not handler:
+        ui.print_error(f"Unsupported file format: {filepath.suffix}")
+        sys.exit(1)
+
+    ui.print_banner()
+    tm = TemplateManager()
+    path = tm.extract_and_save(filepath, name, handler, description)
+    ui.print_success(f"Template '{name}' saved → {path}")
+
+
+@template.command("load")
+@click.argument("name")
+def template_load(name: str):
+    """Show the contents of a saved template."""
+    from .templates import TemplateManager
+
+    ui.print_banner()
+    tm = TemplateManager()
+    try:
+        metadata = tm.load(name)
+        click.echo(json.dumps(metadata, indent=2, default=str))
+    except FSFError as e:
+        ui.print_error(str(e))
+        sys.exit(1)
+
+
+@template.command("apply")
+@click.argument("name")
+@click.argument("file", type=click.Path(exists=True))
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file")
+def template_apply(name: str, file: str, output: str):
+    """Apply a saved template to a file."""
+    from .templates import TemplateManager
+
+    filepath = _validate_file(file)
+    handler, ftype = _get_handler(filepath)
+    if not handler:
+        ui.print_error(f"Unsupported file format: {filepath.suffix}")
+        sys.exit(1)
+
+    ui.print_banner()
+    tm = TemplateManager()
+    try:
+        metadata = tm.load(name)
+    except FSFError as e:
+        ui.print_error(str(e))
+        sys.exit(1)
+
+    out_path = Path(output) if output else None
+    handler.spoof_metadata(filepath, metadata, output=out_path)
+    ui.print_success(f"Template '{name}' applied to {filepath.name}")
+
+
+@template.command("list")
+def template_list():
+    """List all saved templates."""
+    from .templates import TemplateManager
+    from rich.table import Table
+
+    ui.print_banner()
+    tm = TemplateManager()
+    templates = tm.list_templates()
+
+    if not templates:
+        ui.print_info("No templates saved yet. Use [cyan]fsf template save <file> <name>[/cyan]")
+        return
+
+    table = Table(title="Saved Templates", show_header=True)
+    table.add_column("Name", style="cyan bold")
+    table.add_column("Description", style="white")
+    table.add_column("Created", style="dim")
+    for t in templates:
+        table.add_row(t['name'], t['description'] or "—", t['created'][:19])
+    ui.console.print(table)
+
+
+@template.command("delete")
+@click.argument("name")
+def template_delete(name: str):
+    """Delete a saved template."""
+    from .templates import TemplateManager
+
+    tm = TemplateManager()
+    if tm.delete(name):
+        ui.print_success(f"Template '{name}' deleted")
+    else:
+        ui.print_error(f"Template '{name}' not found")
+
+
+# ─────────────────────────────────────────────────────
+#  TIMELINE command
+# ─────────────────────────────────────────────────────
+@cli.command()
+@click.argument("files", nargs=-1, type=click.Path(exists=True), required=True)
+@click.option("--city", type=str, default=None, help="City for GPS hotspots")
+@click.option("--preset", type=str, default=None, help="Camera preset name")
+@click.option("--days", type=int, default=None, help="Trip duration in days")
+@click.option("--style", type=click.Choice(["casual", "enthusiast", "professional"]), default="casual",
+              help="Shooting style")
+@click.option("--sync-time", is_flag=True, help="Sync filesystem timestamps to EXIF")
+@click.option("-o", "--output-dir", type=click.Path(), default=None, help="Output directory")
+def timeline(files, city, preset, days, style, sync_time, output_dir):
+    """Apply a realistic trip timeline across multiple photos.
+
+    Generates chronologically ordered metadata with GPS drift between
+    hotspots, time-of-day correlated exposure settings, and natural
+    shooting patterns.
+    """
+    from .timeline import TripTimeline
+
+    file_list = [_validate_file(f) for f in files]
+
+    if not file_list:
+        ui.print_error("No files specified")
+        sys.exit(1)
+
+    ui.print_banner()
+    ui.console.print(f"  [bold cyan]Timeline Generator[/bold cyan] — {len(file_list)} photos\n")
+
+    tl = TripTimeline(city=city, preset=preset, days=days, style=style)
+    timeline_data = tl.generate(num_photos=len(file_list))
+
+    if output_dir:
+        out_dir = Path(output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+    from rich.table import Table
+    table = Table(title=f"Trip: {tl.city} • {tl.days} days • {style}", show_header=True)
+    table.add_column("#", style="dim", width=4)
+    table.add_column("File", style="cyan")
+    table.add_column("DateTime", style="green")
+    table.add_column("GPS", style="yellow")
+    table.add_column("Scene", style="magenta")
+
+    handler = ImageHandler()
+
+    for i, (filepath, exif_data) in enumerate(zip(file_list, timeline_data)):
+        out_path = Path(output_dir) / filepath.name if output_dir else None
+
+        try:
+            handler.spoof_metadata(filepath, exif_data, output=out_path)
+            target = out_path or filepath
+
+            if sync_time and 'datetime_original' in exif_data:
+                sync_timestamps(target, exif_data['datetime_original'])
+
+            dt = exif_data.get('datetime_original', '?')
+            lat = exif_data.get('gps_lat', 0)
+            lat_ref = exif_data.get('gps_lat_ref', 'N')
+            lon = exif_data.get('gps_lon', 0)
+            lon_ref = exif_data.get('gps_lon_ref', 'E')
+            gps_str = f"{lat:.4f}°{lat_ref} {lon:.4f}°{lon_ref}"
+
+            # Determine scene from time
+            hour = int(dt.split(' ')[1].split(':')[0]) if ' ' in dt else 0
+            scene = tl._get_scene_for_hour(hour)
+
+            table.add_row(str(i+1), filepath.name, dt, gps_str, scene)
+        except Exception as e:
+            table.add_row(str(i+1), filepath.name, "[red]ERROR[/red]", str(e), "")
+
+    ui.console.print(table)
+    ui.console.print()
+    ui.print_success(f"Timeline applied: {len(file_list)} photos over {tl.days} days in {tl.city}")
+
+
 def main():
     """Entry point."""
     try:
