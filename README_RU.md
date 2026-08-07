@@ -16,27 +16,28 @@
 
 ## 📖 Оглавление
 
-1. [Особенности и отличие от аналогов](#-особенности-и-отличие-от-аналогов)
-2. [Быстрая установка](#-быстрая-установка)
-3. [Поддерживаемые форматы](#-поддерживаемые-форматы)
-4. [Подробный разбор команд](#-подробный-разбор-команд)
-   - [Просмотр метаданных (`fsf view`)](#1-fsf-view)
-   - [Очистка метаданных (`fsf clean`)](#2-fsf-clean)
-   - [Ручная подмена (`fsf spoof`)](#3-fsf-spoof)
-   - [Реалистичная случайная подмена (`fsf randomize`)](#4-fsf-randomize)
-   - [Создание фейковой личности (`fsf forge`)](#5-fsf-forge)
-   - [Криминалистическая проверка (`fsf audit`)](#6-fsf-audit)
-   - [Сравнение файлов (`fsf compare`)](#7-fsf-compare)
-   - [Пакетная обработка (`fsf batch`)](#8-fsf-batch)
-   - [Анализ рисков приватности (`fsf report`)](#9-fsf-report)
-   - [Просмотр пресетов (`fsf presets`)](#10-fsf-presets)
-   - [Экспорт в JSON (`fsf export`)](#11-fsf-export)
-   - [Копирование метаданных (`fsf clone`)](#12-fsf-clone)
-5. [Пресеты камер, городов и сцен](#-пресеты-камер-городов-и-сцен)
-6. [Разработка и тесты](#-разработка-и-тесты)
+1. [Особенности и отличие от аналогов](#features)
+2. [Быстрая установка](#install)
+3. [Поддерживаемые форматы](#formats)
+4. [Подробный разбор команд](#commands)
+   - [Просмотр метаданных (`fsf view`)](#cmd-view)
+   - [Очистка метаданных (`fsf clean`)](#cmd-clean)
+   - [Ручная подмена (`fsf spoof`)](#cmd-spoof)
+   - [Реалистичная случайная подмена (`fsf randomize`)](#cmd-randomize)
+   - [Создание фейковой личности (`fsf forge`)](#cmd-forge)
+   - [Криминалистическая проверка (`fsf audit`)](#cmd-audit)
+   - [Сравнение файлов (`fsf compare`)](#cmd-compare)
+   - [Пакетная обработка (`fsf batch`)](#cmd-batch)
+   - [Анализ рисков приватности (`fsf report`)](#cmd-report)
+   - [Просмотр пресетов (`fsf presets`)](#cmd-presets)
+   - [Экспорт в JSON (`fsf export`)](#cmd-export)
+   - [Копирование метаданных (`fsf clone`)](#cmd-clone)
+5. [Пресеты камер, городов и сцен](#presets)
+6. [Разработка и тесты](#dev)
 
 ---
 
+<a id="features"></a>
 ## ✨ Особенности и отличие от аналогов
 
 | Возможность | FSF Tools 🛡️ | ExifTool 📸 | MAT2 🧹 |
@@ -50,6 +51,7 @@
 
 ---
 
+<a id="install"></a>
 ## 🚀 Быстрая установка
 
 ### Способ 1: Прямо с GitHub через pip
@@ -75,6 +77,7 @@ fsf --version
 
 ---
 
+<a id="formats"></a>
 ## 📁 Поддерживаемые форматы
 
 - **Изображения**: JPEG (`.jpg`, `.jpeg`), PNG (`.png`), TIFF (`.tiff`, `.tif`), WebP (`.webp`)
@@ -84,8 +87,10 @@ fsf --version
 
 ---
 
+<a id="commands"></a>
 ## 📋 Подробный разбор команд
 
+<a id="cmd-view"></a>
 ### 1. `fsf view` — Просмотр метаданных
 Отображает все найденные EXIF, ID3, PDF и DocumentInfo метаданные в виде красивой таблицы.
 
@@ -94,6 +99,7 @@ fsf view photo.jpg
 fsf view --json document.pdf
 ```
 
+<a id="cmd-clean"></a>
 ### 2. `fsf clean` — Полная очистка
 Удаляет ВСЕ метаданные из файла (EXIF, GPS, имя автора, программное обеспечение).
 
@@ -105,6 +111,7 @@ fsf clean photo.jpg
 fsf clean photo.jpg -o clean_photo.jpg
 ```
 
+<a id="cmd-spoof"></a>
 ### 3. `fsf spoof` — Ручная подмена
 Позволяет вручную задать конкретную камеру, город, автора или дату.
 
@@ -116,6 +123,7 @@ fsf spoof photo.jpg --preset iphone_15_pro --city tokyo --sync-time
 fsf spoof doc.docx --author "Иван Иванов" --title "Открытый отчет"
 ```
 
+<a id="cmd-randomize"></a>
 ### 4. `fsf randomize` — Реалистичная подмена
 Генерирует физически корректные метаданные с учетом треугольника экспозиции (ISO ↔ Выдержка ↔ Диафрагма).
 
@@ -127,6 +135,7 @@ fsf randomize photo.jpg
 fsf randomize photo.jpg --scene night_street --city tokyo --preset sony_a7iv --sync-time
 ```
 
+<a id="cmd-forge"></a>
 ### 5. `fsf forge` — Создание фейковой личности
 Генерирует консистентную персону (имя, камера, домашний город, стиль) и применяет её к серии файлов. Выглядит так, словно все снимки сделаны одним человеком в ходе поездки.
 
@@ -137,6 +146,7 @@ fsf forge *.jpg --locale jp --city kyoto --camera fuji_xt5 -o ./output/
 
 Доступные локали имен: `en` (США/Англия), `de` (Германия), `jp` (Япония), `es` (Испания), `ru` (Россия), `kr` (Корея).
 
+<a id="cmd-audit"></a>
 ### 6. `fsf audit` — Криминалистическая проверка
 Проверяет файл на аномалии, которые могут выявить криминалистические инструменты (несоответствие даты файла и EXIF, нереалистичная экспозиция, несовпадение разрешения матрицы и файла).
 
@@ -145,6 +155,7 @@ fsf audit photo.jpg
 fsf audit --json photo.jpg
 ```
 
+<a id="cmd-compare"></a>
 ### 7. `fsf compare` — Сравнение двух файлов
 Показывает side-by-side сравнение метаданных двух файлов с индикацией совпадений (`=`) и различий (`≠`).
 
@@ -152,6 +163,7 @@ fsf audit --json photo.jpg
 fsf compare original.jpg spoofed.jpg
 ```
 
+<a id="cmd-batch"></a>
 ### 8. `fsf batch` — Пакетная обработка
 Очистка или случайная подмена метаданных для всей папки.
 
@@ -163,6 +175,7 @@ fsf batch ./photos/ --action clean -r
 fsf batch ./photos/ --action randomize --preset iphone_15_pro -o ./clean_photos/
 ```
 
+<a id="cmd-report"></a>
 ### 9. `fsf report` — Анализ рисков приватности
 Оценивает уровень опасности метаданных (наличие точных координат GPS, серийного номера, имени автора) по шкале от 0 до 100.
 
@@ -170,6 +183,7 @@ fsf batch ./photos/ --action randomize --preset iphone_15_pro -o ./clean_photos/
 fsf report photo.jpg
 ```
 
+<a id="cmd-presets"></a>
 ### 10. `fsf presets` — Список пресетов
 Выводит доступные камеры и города с GPS координатами и точками интереса.
 
@@ -178,6 +192,7 @@ fsf presets --cameras
 fsf presets --cities
 ```
 
+<a id="cmd-export"></a>
 ### 11. `fsf export` — Экспорт метаданных
 Сохраняет всю структуру метаданных файла в JSON-файл.
 
@@ -185,6 +200,7 @@ fsf presets --cities
 fsf export photo.jpg -o metadata.json
 ```
 
+<a id="cmd-clone"></a>
 ### 12. `fsf clone` — Копирование метаданных
 Копирует метаданные из исходного файла в целевой.
 
@@ -194,7 +210,8 @@ fsf clone source.jpg target.jpg -o output.jpg
 
 ---
 
-## 🎨 Пресети камер, городов и сцен
+<a id="presets"></a>
+## 🎨 Пресеты камер, городов и сцен
 
 ### Поддерживаемые камеры (18 пресетов):
 - **Apple**: iPhone 15 Pro, iPhone 14
@@ -219,6 +236,7 @@ fsf clone source.jpg target.jpg -o output.jpg
 
 ---
 
+<a id="dev"></a>
 ## 🧪 Разработка и тесты
 
 Запуск полного тестового набора (27 тестов):
