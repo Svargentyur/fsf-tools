@@ -10,6 +10,8 @@
 
 *View, clean, spoof, forge, and audit metadata across images, audio, PDF, and Office files*
 
+**[Русское руководство / Russian Guide](README_RU.md)**
+
 <br />
 
 ![FSF Tools Preview](docs/screenshot.png)
