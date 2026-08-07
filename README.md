@@ -6,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/fsf-tools.svg)](https://pypi.org/project/fsf-tools/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
 *View, clean, spoof, forge, and audit metadata across images, audio, PDF, and Office files*
 
@@ -123,4 +123,4 @@ pytest
 
 ## 📝 License
 
-Released under the [MIT License](LICENSE).
+Released under the [GNU General Public License v3.0 (GPL-3.0)](LICENSE).
