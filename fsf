@@ -1,0 +1,4 @@
+#!/home/winston/tools/fsf-tools/.venv/bin/python
+"""FSF Tools — File Sanitization Framework v2.0"""
+from fsf_core.cli import main
+main()
