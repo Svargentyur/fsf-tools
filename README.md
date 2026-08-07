@@ -4,8 +4,8 @@
 
 **File Sanitization Framework** — the Swiss Army knife for file metadata
 
+[![PyPI](https://img.shields.io/pypi/v/fsf-tools.svg)](https://pypi.org/project/fsf-tools/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-2.0.0-success.svg)](https://github.com/Svargentyur/fsf-tools)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 *View, clean, spoof, forge, and audit metadata across images, audio, PDF, and Office files*
@@ -34,7 +34,7 @@
 
 ### Install
 ```bash
-pip install git+https://github.com/Svargentyur/fsf-tools.git
+pip install fsf-tools
 # or clone for development
 git clone https://github.com/Svargentyur/fsf-tools.git
 cd fsf-tools

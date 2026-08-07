@@ -54,10 +54,10 @@
 <a id="install"></a>
 ## 🚀 Быстрая установка
 
-### Способ 1: Прямо с GitHub через pip
+### Способ 1: Прямо из PyPI через pip
 
 ```bash
-pip install git+https://github.com/Svargentyur/fsf-tools.git
+pip install fsf-tools
 ```
 
 ### Способ 2: Клонирование и локальная установка
