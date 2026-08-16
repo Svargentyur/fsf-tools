@@ -33,6 +33,7 @@
 | **Trip Timeline** | **Yes (multi-day GPS drift)** | No | No |
 | **Hash Mutation** | **Yes (change hash without corruption)** | No | No |
 | **Metadata Templates** | **Yes (save/load YAML profiles)** | Partial (argfiles) | No |
+| **Video Support** `NEW` | **Yes (MP4/MOV/M4V/MKV/AVI/WebM)** | Yes | Yes (basic) |
 
 ## 🚀 Quick Start
 
@@ -45,7 +46,7 @@ cd fsf-tools
 pip install -e .
 ```
 
-## 📋 Commands (16 total)
+## 📋 Commands (19 total)
 
 ### 🔍 View metadata
 ```bash
@@ -59,7 +60,7 @@ fsf clean photo.jpg
 fsf clean photo.jpg -o clean.jpg
 ```
 
-### ✂️ Strip (surgical removal) `NEW`
+### ✂️ Strip (surgical removal)
 Remove only specific metadata categories — keep everything else intact.
 ```bash
 fsf strip photo.jpg --gps              # GPS/location only
@@ -86,14 +87,14 @@ fsf randomize photo.jpg --scene night_street --preset sony_a7iv --sync-time
 fsf forge *.jpg --locale jp --camera fuji_xt5 --city kyoto
 ```
 
-### 📅 Timeline (trip simulation) `NEW`
+### 📅 Timeline (trip simulation)
 Apply a realistic multi-day trip timeline with GPS drift between hotspots, time-of-day correlated exposure, and natural shooting patterns.
 ```bash
 fsf timeline *.jpg --city tokyo --preset sony_a7iv --days 3 --sync-time
 fsf timeline *.jpg --city paris --style enthusiast --days 5
 ```
 
-### 🔑 Hash (compute, verify, mutate) `NEW`
+### 🔑 Hash (compute, verify, mutate)
 ```bash
 fsf hash photo.jpg                         # Show MD5/SHA1/SHA256
 fsf hash photo.jpg -a sha512               # Specific algorithm
@@ -101,7 +102,7 @@ fsf hash photo.jpg --mutate                # Change hash without corrupting file
 fsf hash photo.jpg --verify <expected>     # Verify against known hash
 ```
 
-### 📋 Template (save/load metadata profiles) `NEW`
+### 📋 Template (save/load metadata profiles)
 ```bash
 fsf template save photo.jpg my_preset -d "Tokyo night preset"
 fsf template list
@@ -110,8 +111,28 @@ fsf template delete my_preset
 ```
 
 ### 🕵️ Audit (forensic consistency check)
+Numerical score 0-100 (EXCELLENT/GOOD/SUSPICIOUS/LIKELY FAKE/OBVIOUS FAKE) with 15 forensic checks including Pillow marker detection, thumbnail consistency, GPS altitude plausibility.
 ```bash
 fsf audit photo.jpg
+```
+
+### 🖥️ TUI (Interactive Terminal UI) `NEW`
+Interactive textual-based UI with file tree, metadata viewer, and hotkeys (C/R/A/H). Requires `textual` dependency.
+```bash
+fsf tui
+```
+
+### 🔗 Pipeline (chain operations) `NEW`
+Chain operations via inline spec or YAML configs.
+```bash
+fsf pipeline -s 'clean+spoof:iphone_15_pro:tokyo+audit'
+fsf pipeline --config paranoid
+```
+
+### ⚖️ Diff (visual comparison) `NEW`
+Visual metadata diff (only changed fields, red/green colored).
+```bash
+fsf diff original.jpg modified.jpg
 ```
 
 ### 🛠️ Other Commands
@@ -141,6 +162,7 @@ fsf audit photo.jpg
 | Format | View | Clean | Spoof | Strip | Clone |
 |--------|:---:|:---:|:---:|:---:|:---:|
 | **JPEG / PNG / TIFF / WebP** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Video (MP4/MOV/M4V/MKV/AVI/WebM)** `NEW` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **MP3 / FLAC / OGG / M4A** | ✅ | ✅ | ✅ | — | ✅ |
 | **PDF** | ✅ | ✅ | ✅ | — | ✅ |
 | **DOCX / XLSX / PPTX** | ✅ | ✅ | ✅ | — | ✅ |

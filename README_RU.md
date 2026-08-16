@@ -2,7 +2,7 @@
 
 # 🛡️ FSF Tools — Руководство пользователя (RU)
 
-**File Sanitization Framework v2.1.0** — швейцарский нож для работы с метаданными файлов.
+**File Sanitization Framework v3.0.0** — швейцарский нож для работы с метаданными файлов.
 
 [English README](README.md) • [Репозиторий GitHub](https://github.com/Svargentyur/fsf-tools)
 
@@ -22,13 +22,16 @@
 4. [Подробный разбор команд (16 шт.)](#commands)
    - [Просмотр метаданных (`fsf view`)](#cmd-view)
    - [Очистка метаданных (`fsf clean`)](#cmd-clean)
-   - [Хирургическое удаление (`fsf strip`)](#cmd-strip) `NEW`
+   - [Хирургическое удаление (`fsf strip`)](#cmd-strip)
    - [Ручная подмена (`fsf spoof`)](#cmd-spoof)
    - [Реалистичная подмена (`fsf randomize`)](#cmd-randomize)
    - [Создание фейковой личности (`fsf forge`)](#cmd-forge)
-   - [Таймлайн поездки (`fsf timeline`)](#cmd-timeline) `NEW`
-   - [Хеши файлов (`fsf hash`)](#cmd-hash) `NEW`
-   - [Шаблоны метаданных (`fsf template`)](#cmd-template) `NEW`
+   - [Таймлайн поездки (`fsf timeline`)](#cmd-timeline)
+   - [Хеши файлов (`fsf hash`)](#cmd-hash)
+   - [Шаблоны метаданных (`fsf template`)](#cmd-template)
+   - [Интерактивный интерфейс TUI (`fsf tui`)](#cmd-tui) `NEW`
+   - [Конвейер операций (`fsf pipeline`)](#cmd-pipeline) `NEW`
+   - [Визуальное сравнение (`fsf diff`)](#cmd-diff) `NEW`
    - [Криминалистическая проверка (`fsf audit`)](#cmd-audit)
    - [Сравнение файлов (`fsf compare`)](#cmd-compare)
    - [Пакетная обработка (`fsf batch`)](#cmd-batch)
@@ -55,6 +58,7 @@
 | **Таймлайн поездки** | **Да (GPS дрифт по hotspots)** | Нет | Нет |
 | **Мутация хешей** | **Да (изменение хеша без порчи файла)** | Нет | Нет |
 | **Шаблоны метаданных** | **Да (сохранение/загрузка YAML)** | Частично (argfiles) | Нет |
+| **Поддержка видео** `NEW` | **Да (MP4/MOV/M4V/MKV/AVI/WebM)** | Да | Да (базово) |
 
 ---
 
@@ -90,6 +94,7 @@ fsf --version
 | Формат | View | Clean | Spoof | Strip | Clone |
 |--------|:---:|:---:|:---:|:---:|:---:|
 | **JPEG / PNG / TIFF / WebP** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Видео (MP4/MOV/M4V/MKV/AVI/WebM)** `NEW` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **MP3 / FLAC / OGG / M4A** | ✅ | ✅ | ✅ | — | ✅ |
 | **PDF** | ✅ | ✅ | ✅ | — | ✅ |
 | **DOCX / XLSX / PPTX** | ✅ | ✅ | ✅ | — | ✅ |
@@ -118,7 +123,7 @@ fsf clean photo.jpg -o clean_photo.jpg
 ```
 
 <a id="cmd-strip"></a>
-### 3. `fsf strip` — Хирургическое удаление `NEW v2.1.0`
+### 3. `fsf strip` — Хирургическое удаление
 Удаляет **только указанные категории** метаданных, оставляя всё остальное нетронутым.
 
 ```bash
@@ -159,7 +164,7 @@ fsf forge *.jpg --locale jp --city kyoto --camera fuji_xt5 -o ./output/
 Доступные локали имен: `en`, `de`, `jp`, `es`, `ru`, `kr`.
 
 <a id="cmd-timeline"></a>
-### 7. `fsf timeline` — Таймлайн поездки `NEW v2.1.0`
+### 7. `fsf timeline` — Таймлайн поездки
 Генерирует реалистичную последовательность фото как будто сделанных во время поездки: хронологический порядок, GPS drift между достопримечательностями, автоматическая смена сцен по времени суток.
 
 ```bash
@@ -179,7 +184,7 @@ fsf timeline *.jpg --city berlin --style professional --days 1 -o ./output/
 - `professional` — рабочий фотограф (50-200 фото/день)
 
 <a id="cmd-hash"></a>
-### 8. `fsf hash` — Хеши файлов `NEW v2.1.0`
+### 8. `fsf hash` — Хеши файлов
 Вычисление, верификация и мутация хешей.
 
 ```bash
@@ -198,7 +203,7 @@ fsf hash photo.jpg --verify abc123def456...
 ```
 
 <a id="cmd-template"></a>
-### 9. `fsf template` — Шаблоны метаданных `NEW v2.1.0`
+### 9. `fsf template` — Шаблоны метаданных
 Сохранение, загрузка и применение YAML-профилей метаданных.
 
 ```bash
@@ -220,23 +225,48 @@ fsf template delete my_preset
 
 Шаблоны хранятся в `~/.config/fsf-tools/templates/` в формате YAML.
 
+<a id="cmd-tui"></a>
+### 10. `fsf tui` — Интерактивный интерфейс (TUI) `NEW v3.0.0`
+Интерактивный терминальный интерфейс на базе textual с файловым деревом, просмотрщиком метаданных и горячими клавишами (C/R/A/H).
+
+```bash
+fsf tui
+```
+
+<a id="cmd-pipeline"></a>
+### 11. `fsf pipeline` — Конвейер операций `NEW v3.0.0`
+Цепочка операций через inline-спецификации или YAML-конфиги.
+
+```bash
+fsf pipeline -s 'clean+spoof:iphone_15_pro:tokyo+audit'
+fsf pipeline --config paranoid
+```
+
+<a id="cmd-diff"></a>
+### 12. `fsf diff` — Визуальное сравнение `NEW v3.0.0`
+Визуальный diff метаданных (только измененные поля, подсветка красным/зеленым).
+
+```bash
+fsf diff original.jpg modified.jpg
+```
+
 <a id="cmd-audit"></a>
-### 10. `fsf audit` — Криминалистическая проверка
-Проверяет файл на аномалии (10 проверок).
+### 13. `fsf audit` — Криминалистическая проверка
+Оценка от 0 до 100 (EXCELLENT/GOOD/SUSPICIOUS/LIKELY FAKE/OBVIOUS FAKE) с 15 криминалистическими проверками, включая обнаружение маркеров Pillow, консистентность миниатюр, правдоподобность высоты GPS.
 
 ```bash
 fsf audit photo.jpg
 ```
 
 <a id="cmd-compare"></a>
-### 11. `fsf compare` — Сравнение двух файлов
+### 14. `fsf compare` — Сравнение двух файлов
 
 ```bash
 fsf compare original.jpg spoofed.jpg
 ```
 
 <a id="cmd-batch"></a>
-### 12. `fsf batch` — Пакетная обработка
+### 15. `fsf batch` — Пакетная обработка
 
 ```bash
 fsf batch ./photos/ --action clean -r
@@ -244,14 +274,14 @@ fsf batch ./photos/ --action randomize --preset iphone_15_pro -o ./clean_photos/
 ```
 
 <a id="cmd-report"></a>
-### 13. `fsf report` — Анализ рисков приватности
+### 16. `fsf report` — Анализ рисков приватности
 
 ```bash
 fsf report photo.jpg
 ```
 
 <a id="cmd-presets"></a>
-### 14. `fsf presets` — Список пресетов
+### 17. `fsf presets` — Список пресетов
 
 ```bash
 fsf presets --cameras
@@ -259,14 +289,14 @@ fsf presets --cities
 ```
 
 <a id="cmd-export"></a>
-### 15. `fsf export` — Экспорт метаданных
+### 18. `fsf export` — Экспорт метаданных
 
 ```bash
 fsf export photo.jpg -o metadata.json
 ```
 
 <a id="cmd-clone"></a>
-### 16. `fsf clone` — Копирование метаданных
+### 19. `fsf clone` — Копирование метаданных
 
 ```bash
 fsf clone source.jpg target.jpg -o output.jpg
