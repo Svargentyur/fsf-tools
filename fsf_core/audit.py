@@ -21,12 +21,24 @@ class ForensicAuditor:
             'DJI': lambda s: s.startswith('v'),
         }
 
-    def audit(self, filepath: Path) -> list[dict]:
+    @staticmethod
+    def score_label(score: int) -> str:
+        if score >= 90:
+            return 'EXCELLENT'
+        elif score >= 70:
+            return 'GOOD'
+        elif score >= 50:
+            return 'SUSPICIOUS'
+        elif score >= 30:
+            return 'LIKELY FAKE'
+        return 'OBVIOUS FAKE'
+
+    def audit(self, filepath: Path) -> tuple[list[dict], int]:
         findings = []
         try:
             from fsf_core.handlers.image import ImageHandler
             if not ImageHandler.can_handle(filepath):
-                return findings
+                return findings, 100
             
             meta = ImageHandler.view_metadata(filepath)
             
@@ -36,7 +48,13 @@ class ForensicAuditor:
                     'check': 'Empty metadata',
                     'detail': 'File has NO metadata at all (suspiciously clean)'
                 })
-                return findings
+                score = 100
+                for f in findings:
+                    if f['level'] == 'FAIL':
+                        score -= 15
+                    elif f['level'] == 'WARN':
+                        score -= 5
+                return findings, max(0, min(100, score))
 
             exif = meta.get('exif', {})
             gps = meta.get('gps', {})
@@ -159,7 +177,63 @@ class ForensicAuditor:
                 if 'XF' in lens_model and 'FUJIFILM' not in make_u:
                     findings.append({'level': 'WARN', 'check': 'Lens vs camera', 'detail': f'XF mount lens with non-Fujifilm make: {make}'})
 
+            # a. Pillow marker detection
+            if software:
+                if 'Pillow' in software or 'PIL' in software:
+                    findings.append({'level': 'FAIL', 'check': 'Pillow marker detection', 'detail': f'Software tag indicates Python PIL/Pillow processing: {software}'})
+
+            # b. JFIF version check & c. Thumbnail consistency
+            try:
+                with Image.open(filepath) as img:
+                    jfif = img.info.get('jfif_version')
+                    if jfif and make:
+                        findings.append({'level': 'WARN', 'check': 'JFIF version check', 'detail': f'JFIF segment {jfif} present alongside EXIF make {make} (typically mutually exclusive in original camera files)'})
+                    
+                    exif_obj = img.getexif()
+                    if exif_obj:
+                        ifd1 = exif_obj.get_ifd(1)
+                        t_w = ifd1.get(0x0100) or ifd1.get(256)
+                        t_h = ifd1.get(0x0101) or ifd1.get(257)
+                        
+                        size_str = basic.get('Size')
+                        if size_str and t_w and t_h:
+                            try:
+                                actual_w, actual_h = map(int, size_str.split('x'))
+                                t_ratio = float(t_w) / float(t_h)
+                                m_ratio = float(actual_w) / float(actual_h)
+                                # Check if aspect ratio difference is greater than 0.1
+                                if abs(t_ratio - m_ratio) > 0.1:
+                                    findings.append({'level': 'WARN', 'check': 'Thumbnail consistency', 'detail': f'Thumbnail aspect ratio ({t_w}x{t_h}) differs significantly from main image ({actual_w}x{actual_h})'})
+                            except Exception: pass
+            except Exception: pass
+
+            # d. GPS altitude plausibility
+            alt = gps.get('GPSAltitude')
+            if alt is not None:
+                try:
+                    import re
+                    nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(alt))
+                    if nums:
+                        alt_val = float(nums[0])
+                        if alt_val > 8849 or alt_val < -430:
+                            findings.append({'level': 'WARN', 'check': 'GPS altitude plausibility', 'detail': f'Altitude {alt_val}m is outside plausible range (-430m to 8849m)'})
+                except Exception: pass
+
+            # e. SubSecTime pattern
+            subsec = exif.get('SubSecTimeOriginal') or exif.get('SubSecTime') or exif.get('SubSecTimeDigitized')
+            if subsec:
+                subsec_str = str(subsec).strip()
+                if set(subsec_str) == {'0'} or subsec_str in ['123', '1234', '999', '9999']:
+                    findings.append({'level': 'WARN', 'check': 'SubSecTime pattern', 'detail': f'SubSecTime looks suspiciously artificial/round: {subsec_str}'})
+
         except Exception as e:
             log.error(f'Error auditing {filepath}: {e}')
             
-        return findings
+        score = 100
+        for f in findings:
+            if f['level'] == 'FAIL':
+                score -= 15
+            elif f['level'] == 'WARN':
+                score -= 5
+        score = max(0, min(100, score))
+        return findings, score

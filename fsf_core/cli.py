@@ -34,6 +34,19 @@ def _get_office_handler():
     return _office_handler if _office_handler else None
 
 
+# Lazy import for video handler
+_video_handler = None
+def _get_video_handler():
+    global _video_handler
+    if _video_handler is None:
+        try:
+            from .handlers.video import VideoHandler
+            _video_handler = VideoHandler
+        except ImportError:
+            _video_handler = False
+    return _video_handler if _video_handler else None
+
+
 def _get_handler(filepath: Path):
     """Return the appropriate handler for a file, or (None, None)."""
     if ImageHandler.can_handle(filepath):
@@ -45,6 +58,9 @@ def _get_handler(filepath: Path):
     OfficeHandler = _get_office_handler()
     if OfficeHandler and OfficeHandler.can_handle(filepath):
         return OfficeHandler(), 'office'
+    VideoHandler = _get_video_handler()
+    if VideoHandler and VideoHandler.can_handle(filepath):
+        return VideoHandler(), 'video'
     return None, None
 
 
@@ -813,26 +829,47 @@ def audit(file: str, as_json: bool):
     try:
         from .audit import ForensicAuditor
         auditor = ForensicAuditor()
-        findings = auditor.audit(filepath)
+        audit_result = auditor.audit(filepath)
+        # v3.0: audit returns (findings, score) tuple
+        if isinstance(audit_result, tuple):
+            findings, score = audit_result
+        else:
+            findings, score = audit_result, None
     except ImportError:
         ui.print_error("Audit module not available")
         sys.exit(1)
 
     if as_json:
-        ui.console.print_json(json.dumps(findings, indent=2, ensure_ascii=False, default=str))
+        data = {'findings': findings, 'score': score}
+        if score is not None:
+            data['label'] = ForensicAuditor.score_label(score)
+        ui.console.print_json(json.dumps(data, indent=2, ensure_ascii=False, default=str))
         return
 
     if not findings:
         ui.print_success("No inconsistencies found — metadata looks clean! ✓")
+        if score is not None:
+            ui.print_info(f"Forensic Score: [bold green]{score}/100[/bold green] ({ForensicAuditor.score_label(score)})")
         return
 
     # Count by level
     fails = sum(1 for f in findings if f['level'] == 'FAIL')
     warns = sum(1 for f in findings if f['level'] == 'WARN')
-    oks = sum(1 for f in findings if f['level'] == 'OK')
+    oks = sum(1 for f in findings if f['level'] == 'OK' or f['level'] == 'PASS')
 
-    # Overall grade
-    if fails > 0:
+    # Score-based grade (v3.0)
+    if score is not None:
+        label = ForensicAuditor.score_label(score)
+        if score >= 90:
+            score_color = 'green'
+        elif score >= 70:
+            score_color = 'cyan'
+        elif score >= 50:
+            score_color = 'yellow'
+        else:
+            score_color = 'red'
+        grade_text = f"[bold {score_color}]{score}/100 — {label}[/bold {score_color}]"
+    elif fails > 0:
         grade_text = f"[bold red]SUSPICIOUS[/bold red] — {fails} critical issues"
     elif warns > 2:
         grade_text = f"[bold yellow]QUESTIONABLE[/bold yellow] — {warns} warnings"
@@ -842,7 +879,7 @@ def audit(file: str, as_json: bool):
         grade_text = "[bold green]CLEAN[/bold green] — no issues detected"
 
     ui.console.print(Panel(
-        f"  Forensic Grade: {grade_text}",
+        f"  Forensic Score: {grade_text}",
         title="[bold]🔍 Audit Result[/bold]",
         border_style="cyan",
         expand=True,
@@ -865,6 +902,7 @@ def audit(file: str, as_json: bool):
     level_icons = {
         'FAIL': '[bold red]FAIL[/bold red]',
         'WARN': '[bold yellow]WARN[/bold yellow]',
+        'PASS': '[bold green]PASS[/bold green]',
         'OK': '[bold green]OK[/bold green]',
     }
 
@@ -1182,6 +1220,170 @@ def timeline(files, city, preset, days, style, sync_time, output_dir):
     ui.console.print(table)
     ui.console.print()
     ui.print_success(f"Timeline applied: {len(file_list)} photos over {tl.days} days in {tl.city}")
+
+
+# ─────────────────────────────────────────────────────
+#  TUI command
+# ─────────────────────────────────────────────────────
+@cli.command()
+@click.argument("directory", type=click.Path(exists=True), default=".")
+def tui(directory: str):
+    """Launch interactive Terminal UI for browsing and editing metadata.
+
+    Navigate files with arrow keys, view metadata, and perform actions
+    (Clean, Randomize, Audit, Hash) with hotkeys.
+    """
+    from .tui import run_tui
+    run_tui(directory=directory)
+
+
+# ─────────────────────────────────────────────────────
+#  PIPELINE command
+# ─────────────────────────────────────────────────────
+@cli.command()
+@click.argument("file", type=click.Path(exists=True))
+@click.option("--steps", "-s", type=str, default=None,
+              help="Inline pipeline spec: 'clean+spoof:iphone_15_pro:tokyo+audit'")
+@click.option("--config", "-c", type=str, default=None,
+              help="Load pipeline from saved YAML config name")
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file")
+def pipeline(file: str, steps: str, config: str, output: str):
+    """Run a chain of operations on a file.
+
+    \b
+    Inline examples:
+      fsf pipeline photo.jpg -s 'clean+spoof:iphone_15_pro:tokyo+audit'
+      fsf pipeline photo.jpg -s 'strip:gps+hash:mutate+audit'
+      fsf pipeline photo.jpg -s 'clean+randomize+audit'
+
+    \b
+    From saved config:
+      fsf pipeline photo.jpg --config paranoid
+    """
+    from .pipeline import Pipeline, PipelineManager
+    from rich.table import Table
+
+    filepath = _validate_file(file)
+    out_path = Path(output) if output else None
+
+    if not steps and not config:
+        ui.print_error("Specify --steps or --config")
+        ui.print_info("Example: [cyan]fsf pipeline photo.jpg -s 'clean+spoof:iphone_15_pro:tokyo+audit'[/cyan]")
+        sys.exit(1)
+
+    ui.print_banner()
+    ui.print_file_header(str(filepath))
+
+    if config:
+        pm = PipelineManager()
+        try:
+            pipe = pm.load(config)
+        except FSFError as e:
+            ui.print_error(str(e))
+            sys.exit(1)
+        ui.print_info(f"Loaded pipeline: [bold]{config}[/bold] ({len(pipe.steps)} steps)")
+    else:
+        pipe = PipelineManager.parse_inline(steps)
+        ui.print_info(f"Inline pipeline: {len(pipe.steps)} steps")
+
+    ui.console.print()
+    results = pipe.execute(filepath, output=out_path)
+
+    # Show results table
+    table = Table(title="Pipeline Results", show_header=True)
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Step", style="cyan")
+    table.add_column("Status", style="bold")
+    table.add_column("Detail", style="white")
+
+    for r in results:
+        status_style = {'ok': '[green]OK[/green]', 'warning': '[yellow]WARN[/yellow]',
+                        'error': '[red]ERROR[/red]'}.get(r['status'], r['status'])
+        table.add_row(str(r.get('step_num', '?')), r['step'], status_style, r.get('detail', ''))
+
+    ui.console.print(table)
+    errors = sum(1 for r in results if r['status'] == 'error')
+    if errors:
+        ui.print_warning(f"{errors} step(s) failed")
+    else:
+        ui.print_success(f"Pipeline complete: {len(results)} steps executed")
+
+
+# ─────────────────────────────────────────────────────
+#  DIFF command
+# ─────────────────────────────────────────────────────
+@cli.command()
+@click.argument("file1", type=click.Path(exists=True))
+@click.argument("file2", type=click.Path(exists=True))
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def diff(file1: str, file2: str, as_json: bool):
+    """Show only changed metadata fields between two files.
+
+    Unlike 'compare' which shows all fields side by side,
+    'diff' highlights only the differences.
+    """
+    from rich.table import Table
+    from rich import box
+
+    fp1 = _validate_file(file1)
+    fp2 = _validate_file(file2)
+
+    h1, t1 = _get_handler(fp1)
+    h2, t2 = _get_handler(fp2)
+
+    if not h1 or not h2:
+        ui.print_error("Both files must be supported formats")
+        sys.exit(1)
+
+    meta1 = h1.view_metadata(fp1)
+    meta2 = h2.view_metadata(fp2)
+
+    # Flatten metadata dicts
+    flat1, flat2 = {}, {}
+    for cat, data in meta1.items():
+        for k, v in data.items():
+            flat1[f"{cat}.{k}"] = str(v)
+    for cat, data in meta2.items():
+        for k, v in data.items():
+            flat2[f"{cat}.{k}"] = str(v)
+
+    all_keys = sorted(set(flat1.keys()) | set(flat2.keys()))
+    diffs = []
+    for key in all_keys:
+        v1 = flat1.get(key, '—')
+        v2 = flat2.get(key, '—')
+        if v1 != v2:
+            diffs.append((key, v1, v2))
+
+    if as_json:
+        diff_data = [{'field': k, 'file1': v1, 'file2': v2} for k, v1, v2 in diffs]
+        click.echo(json.dumps(diff_data, indent=2, default=str))
+        return
+
+    ui.print_banner()
+
+    if not diffs:
+        ui.print_success("Files have identical metadata")
+        return
+
+    table = Table(
+        title=f"Metadata Diff ({len(diffs)} changes)",
+        show_header=True,
+        header_style="bold bright_cyan",
+        border_style="dim",
+        box=box.ROUNDED,
+        expand=True,
+    )
+    table.add_column("Field", style="cyan", min_width=20)
+    table.add_column(fp1.name, style="red", min_width=25)
+    table.add_column(fp2.name, style="green", min_width=25)
+
+    for key, v1, v2 in diffs:
+        table.add_row(key, str(v1)[:60], str(v2)[:60])
+
+    ui.console.print(table)
+    ui.console.print()
+    ui.print_info(f"{len(diffs)} field(s) differ between the two files")
 
 
 def main():

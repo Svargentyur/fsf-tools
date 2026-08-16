@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "fsf-tools"
 dynamic = ["version"]
-description = "File Sanitization Framework — CLI for viewing, cleaning, spoofing, and forging file metadata"
+description = "File Sanitization Framework — CLI & TUI for viewing, cleaning, spoofing, forging, and auditing file metadata"
 requires-python = ">=3.10"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
@@ -21,7 +21,8 @@ dependencies = [
     "python-docx>=1.0",
     "openpyxl>=3.1",
     "pyyaml>=6.0",
-    "piexif>=1.1"
+    "piexif>=1.1",
+    "textual>=0.80"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
